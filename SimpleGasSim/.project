@@ -16,9 +16,9 @@
 	</natures>
 	<linkedResources>
 		<link>
-			<name>lib</name>
+			<name>DzuchunLib</name>
 			<type>2</type>
-			<location>/home/dzu/Documents/FF/1.2/Mol/sim/DzuchunLib/src</location>
+			<location>/home/dzu/git/DzuchunLib/DzuchunLib/src</location>
 		</link>
 	</linkedResources>
 </projectDescription>

@@ -1,4 +1,4 @@
-package dzuchun.sim.simplegas;
+package dzuchun.sim.simplegas.test;
 
 import java.awt.BorderLayout;
 import java.awt.FlowLayout;
@@ -15,7 +15,9 @@ import javax.swing.WindowConstants;
 import dzuchun.lib.graph.Point2DGrapher;
 import dzuchun.lib.math.GeometricVector2D;
 import dzuchun.lib.sim.Simulator;
+import dzuchun.sim.simplegas.ParticleSystem;
 import dzuchun.sim.simplegas.ParticleSystem.SimpleChecker;
+import dzuchun.sim.simplegas.Settings;
 
 public class ExperimentFrame<T extends Particle2D> extends JFrame {
 	/**
@@ -25,6 +27,7 @@ public class ExperimentFrame<T extends Particle2D> extends JFrame {
 
 	private static final Boolean SAVING_VELDIST = true;
 
+	@SuppressWarnings("unused")
 	private final Simulator<ParticleSystem<GeometricVector2D, T>, ?, SimpleChecker<GeometricVector2D, T>> simulator;
 	public final Point2DGrapher<T> pointGrapher;
 	private static final String[] BUTTON_STATES = new String[] { "ON", "OFF" };
@@ -164,21 +167,20 @@ public class ExperimentFrame<T extends Particle2D> extends JFrame {
 		}
 	}
 
+	@SuppressWarnings("null")
 	public void redestributeVelocity() {
 		if (!distributionFrame.isVisible() && !ExperimentFrame.SAVING_VELDIST) {
 			return;
 		}
 		final double maxSpeed = Settings.MAX_SPEED;
 		final int distSize = Settings.DISTRIBUTION_SIZE;
-		int[] distribution = this.simulator.getSimulation().distributeVelocity(
-				v -> ((int) Math.min(Math.floor((Math.min(v, maxSpeed) / maxSpeed) * distSize), distSize - 1)),
-				distSize);
+		Integer[] distribution = null;
 		if (Settings.ENABLE_GAUSSIAN_MEAN) {
-			int[] meanedDestribution = new int[distSize];
+			Integer[] meanedDestribution = new Integer[distSize];
 			updateGaussianValues(distSize, Settings.GAUSSIAN_SIGMA, maxSpeed / distSize);
 			for (int i = 0; i < distSize; i++) {
 				for (int j = 0; j < distSize; j++) {
-					meanedDestribution[j] += distribution[i] * gaussianValues[Math.abs(i - j)] * 10;
+					meanedDestribution[j] += (int) (distribution[i] * gaussianValues[Math.abs(i - j)] * 10);
 				}
 			}
 			distribution = meanedDestribution;
@@ -213,7 +215,7 @@ public class ExperimentFrame<T extends Particle2D> extends JFrame {
 					}).build());
 		}
 
-		public void updateDistribution(int[] distributionIn) {
+		public void updateDistribution(Integer[] distributionIn) {
 			boolean flag = false;
 			for (int i = 0; i < Settings.DISTRIBUTION_SIZE; i++) {
 				if (distribution.get(i).getY() != distributionIn[i]) {

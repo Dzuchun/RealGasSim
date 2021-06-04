@@ -3,6 +3,9 @@ package dzuchun.sim.simplegas;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.LinkedHashMap;
+import java.util.Map.Entry;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
@@ -16,8 +19,8 @@ public class ParticleSystem<V extends GeometricVector, T extends Particle<V>> ex
 	 *
 	 */
 	private static final long serialVersionUID = 1L;
-	private final IntegrationPolicy<V, Double> positionPolicy;
-	private final IntegrationPolicy<V, Double> speedPolicy;
+	private final IntegrationPolicy<Double, V> positionPolicy;
+	private final IntegrationPolicy<Double, V> speedPolicy;
 	private final Supplier<V> zeroPosFactory;
 	private double time;
 
@@ -28,8 +31,8 @@ public class ParticleSystem<V extends GeometricVector, T extends Particle<V>> ex
 	 * @param speedPolicyIn
 	 * @param graphicalSizeIn  optional
 	 */
-	public ParticleSystem(Collection<T> particlesIn, IntegrationPolicy<V, Double> positionPolicyIn,
-			IntegrationPolicy<V, Double> speedPolicyIn, Supplier<V> zeroPosFactoryIn) {
+	public ParticleSystem(Collection<T> particlesIn, IntegrationPolicy<Double, V> positionPolicyIn,
+			IntegrationPolicy<Double, V> speedPolicyIn, Supplier<V> zeroPosFactoryIn) {
 		super(particlesIn);
 		this.positionPolicy = positionPolicyIn;
 		this.speedPolicy = speedPolicyIn;
@@ -37,7 +40,15 @@ public class ParticleSystem<V extends GeometricVector, T extends Particle<V>> ex
 	}
 
 	public double getKineticEnergy() {
-		return parallelStream().mapToDouble(Particle::kineticEnergy).sum();
+		double res = 0;
+		for (T p : this) {
+//			if (p.kineticEnergy() > 1000.0d) {
+//				p=p;
+//			}
+			res += p.kineticEnergy();
+		}
+		return res;
+//		return parallelStream().mapToDouble(Particle::kineticEnergy).sum();
 	}
 
 	public double getUEnergy() {
@@ -88,7 +99,7 @@ public class ParticleSystem<V extends GeometricVector, T extends Particle<V>> ex
 	}
 
 	@FunctionalInterface
-	public static interface IntegrationPolicy<V, P> {
+	public static interface IntegrationPolicy<P, V> {
 		/**
 		 * Defines policy for integration
 		 *
@@ -98,12 +109,13 @@ public class ParticleSystem<V extends GeometricVector, T extends Particle<V>> ex
 		 * @param delta     Parameter delta
 		 * @return Value change.
 		 */
-		public V integrate(V current, V deriv, P parameter, P delta);
+		public V integrate(P parameter, P delta, V current, Iterable<V> derivs);
 	}
 
 	@Override
 	public void advance(Double dt) {
 		double mass;
+		LinkedHashMap<T, V> assignedForces = new LinkedHashMap<T, V>(0);
 		V force;
 		for (T p : this) {
 			mass = p.getMass();
@@ -112,14 +124,41 @@ public class ParticleSystem<V extends GeometricVector, T extends Particle<V>> ex
 				if (p == p1) {
 					continue;
 				}
-				V force1 = p1.getForce(p);
+				V force1 = p1.getForceOn(p);
 				force.add(force1, false);
 			}
 			force.scale(1 / mass, false);
-			p.stepAccelerate(speedPolicy.integrate(p.getSpeed(), force, time, dt));
+			assignedForces.put(p, force);
+//			p.stepAccelerate(speedPolicy.integrate(time, dt, p.getSpeed(), Arrays.asList(force)));
 		}
-		for (T p : this) {
-			p.stepMove(positionPolicy.integrate(p.getPosition(), p.getSpeed(), time, dt));
+//		for (T p : this) {
+//			p.stepMove(positionPolicy.integrate(time, dt, p.getPosition(), Arrays.asList(p.getSpeed())));
+//		}
+
+		// Belong to feature below
+		double dt2d2 = (dt * dt) / 2;
+		double ddt = 1 / dt;
+		for (Entry<T, V> e : assignedForces.entrySet()) {
+			/*
+			 * Beta-feature: Verlet integration
+			 * https://en.wikipedia.org/wiki/Verlet_integration
+			 */
+			if (Settings.VERLET_INTEGRATION) {
+				T p = e.getKey();
+				@SuppressWarnings("unchecked")
+				V move = (V) p.getLastPos().scale(-1.0d, true).add(p.getPosition(), false)
+						.add(e.getValue().scale(dt2d2, false), false);
+				p.stepMove(move);
+				@SuppressWarnings("unchecked")
+				V tmp = (V) p.getSpeed().scale(-1.0d, true).add(move.scale(ddt, false), false);
+				p.stepAccelerate(tmp);
+			} else {
+
+				e.getKey().stepMove(positionPolicy.integrate(time, dt, e.getKey().getPosition(),
+						Arrays.asList(e.getKey().getSpeed(), e.getValue())));
+				e.getKey().stepAccelerate(
+						speedPolicy.integrate(time, dt, e.getKey().getSpeed(), Arrays.asList(e.getValue())));
+			}
 		}
 		time += dt;
 	}
@@ -127,7 +166,7 @@ public class ParticleSystem<V extends GeometricVector, T extends Particle<V>> ex
 	public int[] distributeVelocity(Function<Double, Integer> distributor, int distLength) {
 		int[] res = new int[distLength];
 		for (T p : this) {
-			res[distributor.apply(p.getAbsSpeed())]++;
+			res[Math.min(distributor.apply(p.getAbsSpeed()), distLength - 1)]++;
 		}
 		return res;
 	}
@@ -137,6 +176,15 @@ public class ParticleSystem<V extends GeometricVector, T extends Particle<V>> ex
 		int[] res = new int[distLength];
 		for (T p : this) {
 			res[distributor.apply(parameterGetterIn.apply(p))]++;
+		}
+		return res;
+	}
+
+	public double calculateParameter(Function<T, Double> parameterGetterIn, BiFunction<Double, Double, Double> combiner,
+			double beginValue) {
+		double res = beginValue;
+		for (T p : this) {
+			res = combiner.apply(res, parameterGetterIn.apply(p));
 		}
 		return res;
 	}

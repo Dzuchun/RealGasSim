@@ -10,6 +10,9 @@ public class Particle3D extends GeometricVector3D implements Particle<GeometricV
 	public Particle3D(double x, double y, double z) {
 		super(x, y, z);
 		speed = new GeometricVector3D();
+
+		// Belong to verlet integration feature
+		lastPos = new GeometricVector3D(this);
 	}
 
 	public Particle3D(GeometricVector3D posIn, GeometricVector3D velIn) {
@@ -22,22 +25,30 @@ public class Particle3D extends GeometricVector3D implements Particle<GeometricV
 		return new GeometricVector3D(speed);
 	}
 
+	public void scaleSpeed(double factor) {
+		speed.scale(factor, false);
+	}
+
 	public static final double SIGMA_SQ = Settings.SIGMA * Settings.SIGMA;
 
+	public GeometricVector3D getRelativePos(Particle<GeometricVector3D> particle) {
+		return (GeometricVector3D) particle.getPosition().scale(-1.0d, true).add(this, false);
+	}
+
 	@Override
-	public GeometricVector3D getForce(Particle<GeometricVector3D> particle) {
-		GeometricVector position = scale(-1.0d, true).add(particle.getPosition(), false).scale(-1.0d, false);
+	public GeometricVector3D getForceOn(Particle<GeometricVector3D> particle) {
+		GeometricVector3D position = getRelativePos(particle);
 		double distanceSq = position.dotProduct(position);
-		double d = Particle3D.SIGMA_SQ / distanceSq;
-		double k = ((24.0d * Settings.EPSILON) / Math.sqrt(distanceSq)) * Math.pow(d, 3) * (1 - (2 * Math.pow(d, 3)));
-		return new GeometricVector3D(position.scale(k, false));
+		double d = Math.pow(Particle3D.SIGMA_SQ / distanceSq, 3);
+		double k = ((12.0d * Settings.EPSILON) / Math.sqrt(distanceSq)) * d * (1 - (2 * d));
+		return (GeometricVector3D) position.scale(k, false);
 	}
 
 	@Override
 	public double getPotential(Particle<GeometricVector3D> particle) {
-		GeometricVector position = scale(-1.0d, true).add(particle.getPosition(), false).scale(-1.0d, false);
+		GeometricVector position = getRelativePos(particle);
 		double d = Math.pow(Particle3D.SIGMA_SQ / position.dotProduct(position), 3);
-		return 4.0d * Settings.EPSILON * d * (d - 1);
+		return 2.0d * Settings.EPSILON * d * (d - 1);
 	}
 
 	@Override
@@ -57,12 +68,20 @@ public class Particle3D extends GeometricVector3D implements Particle<GeometricV
 		return new GeometricVector3D(this);
 	}
 
+	protected GeometricVector3D lastPos;
+
+	@Override
+	public GeometricVector3D getLastPos() {
+		return new GeometricVector3D(lastPos);
+	}
+
 	@Override
 	public void stepMove(GeometricVector3D shift) {
+		lastPos = new GeometricVector3D(this);
 		add(shift, false);
 	}
 
-	private GeometricVector3D lastAcc;
+	protected GeometricVector3D lastAcc;
 
 	@Override
 	public GeometricVector3D getLastAcc() {

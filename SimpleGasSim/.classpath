@@ -2,7 +2,7 @@
 <classpath>
 	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER/org.eclipse.jdt.internal.debug.ui.launcher.StandardVMType/JavaSE-1.8"/>
 	<classpathentry excluding="dzuchun/sim/simplegas/test/ExperimentFrameTest.java" kind="src" path="src"/>
-	<classpathentry excluding="dzuchun/lib/AutoFetchingObject.java|dzuchun/lib/FetchingObject.java" kind="src" path="lib"/>
+	<classpathentry kind="src" path="DzuchunLib"/>
 	<classpathentry kind="lib" path="/home/dzu/Documents/FF/1.2/Mol/sim/poi-5.0.0/poi-5.0.0.jar"/>
 	<classpathentry kind="lib" path="/home/dzu/Documents/FF/1.2/Mol/sim/poi-5.0.0/poi-integration-5.0.0.jar"/>
 	<classpathentry kind="lib" path="/home/dzu/Documents/FF/1.2/Mol/sim/poi-5.0.0/poi-ooxml-lite-5.0.0.jar"/>

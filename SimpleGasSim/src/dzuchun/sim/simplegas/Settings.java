@@ -61,7 +61,6 @@ public class Settings {
 	public static final Boolean ENABLE_FILESAVE = (Boolean) Settings.DATA_PROPERTIES.get("enable_filesave");
 	public static final String SAVES_FORDER = (String) Settings.DATA_PROPERTIES.get("saves_folder");
 	public static final String FILENAME_FORMAT = (String) Settings.DATA_PROPERTIES.get("filename_format");
-	public static final String[] SAVE_FILE_FORMAT = { "time", "energy", "veldist" };
 	public static final double SAVE_INTERVAL = (double) Settings.DATA_PROPERTIES.get("save_interval");
 	// Debug
 	private static final JSONObject DEBUG_PROPERTIES = (JSONObject) Settings.PROPERTIES_OBJECT.get("debug");
@@ -75,5 +74,12 @@ public class Settings {
 	public static final double DEFAULT_MAX_TIME = (double) Settings.GUI_PROPERTIES.get("default_max_time");
 	public static final double DEFAULT_MAX_ENERGY = (double) Settings.GUI_PROPERTIES.get("default_max_energy");
 	public static final int DEFAULT_SIMULATIONS = (int) (long) Settings.GUI_PROPERTIES.get("default_simulations");
-
+	// Features
+	private static final JSONObject FEATURES = (JSONObject) Settings.PROPERTIES_OBJECT.get("features");
+	public static final boolean DELETE_PROXIMATE = (boolean) Settings.FEATURES.get("delete_proximate");
+	public static final boolean SCALE_VELOCITY = (boolean) Settings.FEATURES.get("scale_velocity");
+	public static final boolean CONTINUUM_ATTRACTION = (boolean) Settings.FEATURES.get("continuum_attration");
+	public static final int CONTINUUM_ATTRACTION_ITERATIONS = (int) (long) Settings.FEATURES
+			.get("continuum_attraction_iterations");
+	public static final boolean VERLET_INTEGRATION = (boolean) Settings.FEATURES.get("verlet_integration");
 }

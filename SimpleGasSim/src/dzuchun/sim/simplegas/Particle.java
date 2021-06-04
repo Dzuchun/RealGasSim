@@ -27,7 +27,7 @@ public interface Particle<T extends GeometricVector> {
 	 * @param r
 	 * @return Force applied to provided particle
 	 */
-	public abstract T getForce(Particle<T> particle);
+	public abstract T getForceOn(Particle<T> particle);
 
 	public abstract double getPotential(Particle<T> particle);
 
@@ -42,10 +42,12 @@ public interface Particle<T extends GeometricVector> {
 	public abstract T getSpeed();
 
 	public default double getAbsSpeed() {
-		return Math.sqrt(this.getSpeed().getLength());
+		return this.getSpeed().getLength();
 	}
 
 	public T getLastAcc();
+
+	public T getLastPos();
 
 	public abstract void stepAccelerate(T accStep);
 

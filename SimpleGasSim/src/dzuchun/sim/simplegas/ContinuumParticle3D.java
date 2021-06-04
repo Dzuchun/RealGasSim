@@ -20,44 +20,51 @@ public class ContinuumParticle3D extends Particle3D {
 	public static Supplier<Double> CONTINUUM_Y = () -> Settings.CONTINUUM_MAX_Y;
 	public static Supplier<Double> CONTINUUM_Z = () -> Settings.CONTINUUM_MAX_Z;
 
+	public static Supplier<Double> getContinuumProperty(int n) {
+		return (n == 0) ? ContinuumParticle3D.CONTINUUM_X
+				: (n == 1) ? ContinuumParticle3D.CONTINUUM_Y : ContinuumParticle3D.CONTINUUM_Z;
+	}
+
 	public ContinuumParticle3D(double x, double y, double z) {
-		super(x, y, z);
-		reactBounds();
+		this(x, y, z, 0, 0, 0);
 	}
 
 	public ContinuumParticle3D(double x, double y, double z, double vx, double vy, double vz) {
 		super(x, y, z);
 		speed = new GeometricVector3D(vx, vy, vz);
 		reactBounds();
+
+		// Belong to verlet integration feature
+		lastPos = (GeometricVector3D) speed.scale(-Settings.DT, true).add(this, false);
+	}
+
+	@Override
+	public GeometricVector3D getRelativePos(Particle<GeometricVector3D> particle) {
+		GeometricVector3D relativePos = super.getRelativePos(particle);
+		relativePos.forEachCoord((num, c) -> {
+			double prop = ContinuumParticle3D.getContinuumProperty(num).get() / 2;
+			if (c > prop) {
+				c -= 2 * prop;
+			} else if (c < -prop) {
+				c += 2 * prop;
+			}
+		});
+		return relativePos;
 	}
 
 	protected void reactBounds() {
-		double v = getX(), c = ContinuumParticle3D.CONTINUUM_X.get();
-		if (v < 0) {
-			addToCoord(0, c);
-		} else {
-			if (v > c) {
-				addToCoord(0, -c);
-			}
-		}
-
-		v = getY();
-		c = ContinuumParticle3D.CONTINUUM_Y.get();
-		if (v < 0) {
-			addToCoord(1, c);
-		} else {
-			if (v > c) {
-				addToCoord(1, -c);
-			}
-		}
-
-		v = getZ();
-		c = ContinuumParticle3D.CONTINUUM_Z.get();
-		if (v < 0) {
-			addToCoord(2, c);
-		} else {
-			if (v > c) {
-				addToCoord(2, -c);
+		double v, c;
+		for (int i = 0; i < 3; i++) {
+			v = this.getCoord(i);
+			c = getContinuumProperty(i).get();
+			if (v < 0) {
+				addToCoord(i, c);
+				lastPos.addToCoord(i, c);
+			} else {
+				if (v > c) {
+					addToCoord(i, -c);
+					lastPos.addToCoord(i, -c);
+				}
 			}
 		}
 	}
@@ -72,6 +79,11 @@ public class ContinuumParticle3D extends Particle3D {
 	public ContinuumParticle3D copy() {
 		ContinuumParticle3D res = new ContinuumParticle3D(coords.get(0), coords.get(1), coords.get(2));
 		res.speed = getSpeed();
+
+		// Belong to Verlet integration
+		if (Settings.VERLET_INTEGRATION) {
+			res.lastPos = getLastPos();
+		}
 		return res;
 	}
 

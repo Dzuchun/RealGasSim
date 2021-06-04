@@ -1,46 +1,48 @@
 {
 	"graph": {
 		"min_repaint_time": 30,
-		"distribution_size": 30,
-		"maximum_speed": 40.0,
-		"enable_Gaussian_mean": false,
+		"distribution_size": 100,
+		"maximum_speed": 1.0,
+		"enable_Gaussian_mean": true,
 		"gaussian_sigma": 0.0707
 	},
 	"mech": {
-		"mass": 3.0,
-		"time_unit": 0.1,
-		"max_relative_energy_change": 0.00001,
+		"mass": 40.0,
+		"time_unit": 0.0004,
+		"max_relative_energy_change": 0.000000001,
 		"critical_relative_energy_change": 0.00001,
 		"max_relative_momentum_change": 0.01,
-		"time_quant": 0.001,
-		"continuum_width": 80.0,
-		"continuum_height": 70.0,
-		"continuum_applicate": 500.0
+		"time_quant": 0.0004,
+		"continuum_width": 47.62,
+		"continuum_height": 47.62,
+		"continuum_applicate": 47.62
 	},
 	"force": {
-		"epsilon": 0.0001,
-		"sigma": 20.0
+		"epsilon": 0.988023952095808,
+		"sigma": 3.41
 	},
 	"data": {
 		"enable_filesave": true,
 		"saves_folder": "./saves/",
 		"filename_format": "data.xlsx",
-		"save_file_format": [
-			"time",
-			"energy",
-			"veldist"
-		],
-		"save_interval": 1.0
+		"save_interval": 0.01
 	},
 	"debug": {
 		"pause_on_critical_energy": false
 	},
 	"temporary": {
-		"particles": 20
+		"particles": 50
 	},
-	"gui":{
-		"default_max_time" : 1.0,
-		"default_max_energy" : 2.0,
-		"default_simulations" : 10
+	"gui": {
+		"default_max_time": 100.0,
+		"default_max_energy": 5.0,
+		"default_simulations": 10
+	},
+	"features": {
+		"delete_proximate": false,
+		"scale_velocity": false,
+		"continuum_attration": true,
+		"continuum_attraction_iterations": 1,
+		"verlet_integration": true
 	}
 }

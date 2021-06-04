@@ -1,6 +1,7 @@
-package dzuchun.sim.simplegas;
+package dzuchun.sim.simplegas.test;
 
 import dzuchun.lib.math.GeometricVector2D;
+import dzuchun.sim.simplegas.Particle;
 
 public abstract class Particle2D extends GeometricVector2D implements Particle<GeometricVector2D> {
 

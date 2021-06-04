@@ -1,4 +1,4 @@
-package dzuchun.sim.simplegas;
+package dzuchun.sim.simplegas.test;
 
 import java.awt.Color;
 import java.io.File;
@@ -23,8 +23,11 @@ import dzuchun.lib.graph.Point2DGrapher;
 import dzuchun.lib.math.GeometricVector;
 import dzuchun.lib.math.GeometricVector2D;
 import dzuchun.lib.sim.Simulator;
+import dzuchun.sim.simplegas.Particle;
+import dzuchun.sim.simplegas.ParticleSystem;
 import dzuchun.sim.simplegas.ParticleSystem.SimpleChecker;
-import dzuchun.sim.simplegas.SimpleParticle2D.ContinumParticle2D;
+import dzuchun.sim.simplegas.Settings;
+import dzuchun.sim.simplegas.test.SimpleParticle2D.ContinumParticle2D;
 
 public class SimpleGas {
 	private static File outputFile;
@@ -142,8 +145,7 @@ public class SimpleGas {
 			}
 		};
 		ParticleSystem<GeometricVector2D, ContinumParticle2D> system = new ParticleSystem<GeometricVector2D, ContinumParticle2D>(
-				particles, (p, v, t, dt) -> new GeometricVector2D(v.scale(dt / 2.0d, true)),
-				(v, a, t, dt) -> new GeometricVector2D(a.scale(dt, true)), GeometricVector2D::new);
+				particles, (p, v, t, dt) -> null, (v, a, t, dt) -> null, GeometricVector2D::new);
 		SimpleGas.simulator = new Simulator<ParticleSystem<GeometricVector2D, ContinumParticle2D>, Double, ParticleSystem.SimpleChecker<GeometricVector2D, ContinumParticle2D>>(
 				system, Settings.DT, checker, () -> SimpleGas.frame.keepWorking(), sim -> {
 					ParticleSystem<GeometricVector2D, ContinumParticle2D> systemState = sim.getSimulation();
@@ -183,7 +185,7 @@ public class SimpleGas {
 
 	public static void generateTableHeader(Row row) {
 		int currentCell = 0;
-		for (String param : Settings.SAVE_FILE_FORMAT) {
+		for (String param : new String[] {}) {
 			if (param.equals("veldist")) {
 				Cell cell = row.createCell(currentCell++);
 				cell.setCellValue("Veldist:");
@@ -210,7 +212,7 @@ public class SimpleGas {
 	@SuppressWarnings("unchecked")
 	public static void writeStateToRow(Row row, Map<String, Object> state) {
 		int currentCell = 0;
-		for (String param : Settings.SAVE_FILE_FORMAT) {
+		for (String param : new String[] {}) {
 			if (param.equals("veldist")) {
 				currentCell++;
 				ArrayList<Double> velDist = (ArrayList<java.lang.Double>) state.get(param);
@@ -255,7 +257,7 @@ class SimpleParticle2D extends Particle2D {
 	}
 
 	@Override
-	public GeometricVector2D getForce(Particle<GeometricVector2D> particle) {
+	public GeometricVector2D getForceOn(Particle<GeometricVector2D> particle) {
 		GeometricVector position = scale(-1.0d, true).add(particle.getPosition(), false).scale(-1.0d, false);
 		double distanceSq = position.dotProduct(position);
 		double d = SimpleParticle2D.SIGMA_SQ / distanceSq;
@@ -339,6 +341,11 @@ class SimpleParticle2D extends Particle2D {
 //			return d1 * d1 + d2 * d2;
 //		}
 
+	}
+
+	@Override
+	public GeometricVector2D getLastPos() {
+		return null;
 	}
 
 }
