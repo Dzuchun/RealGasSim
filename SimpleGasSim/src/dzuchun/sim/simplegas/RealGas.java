@@ -43,21 +43,11 @@ public class RealGas {
 					return Math.min(Settings.MIN_DT, dt / 2.0d);
 				} else {
 					// will return null
-					if (dt <= Settings.MIN_DT) {
-//					System.out.println("Warning! Could not handle energy/momentum change");
-						if (Settings.PAUSE_ON_CRITICAL_ENERGY && (Math.abs(Math.log10((candidate.getTotalEnergy()
-								/ base.getTotalEnergy()))) > Settings.CRITICAL_ENERGY_CHANGE)) {
-							System.out.println("Critical energy change got, pausing");
-							// TODO pause 3D
-						}
-					}
-
-					RealGas.frame.stepCallback(candidate);
 
 					/*
-					 * Beta-feature: delete all in-close particles This block must remove one
-					 * of two paired particles from the simulation, as they are dangerous for energy
-					 * values (can't be held properly)
+					 * Beta-feature: delete all in-close particles This block must remove one of two
+					 * paired particles from the simulation, as they are dangerous for energy values
+					 * (can't be held properly)
 					 */
 					if (Settings.DELETE_PROXIMATE) {
 						int particles = candidate.size();
@@ -97,21 +87,29 @@ public class RealGas {
 					}
 
 					/*
-					 * Beta-feature: norms all speed vectors to satisfy energy perfectly. This
-					 * block calculates ratio of present and required energy, and then scales all
-					 * speed vectors to perfectly satisfy energy conservation.
+					 * Beta-feature: norms all speed vectors to satisfy energy perfectly. This block
+					 * calculates ratio of present and required energy, and then scales all speed
+					 * vectors to perfectly satisfy energy conservation.
 					 */
 					if (Settings.SCALE_VELOCITY) {
 						int baseSize = base.size(), candidateSize = candidate.size();
 						double ratio = Math.sqrt((((baseEnergy / baseSize) * candidateSize) - candidate.getUEnergy())
 								/ candidate.getKineticEnergy());
+//						System.out.println("Velocity scaling ratio: " + ratio);
 						if (!Double.isNaN(ratio)) {
 							candidate.forEach(p -> {
 								p.scaleSpeed(ratio);
 							});
+							candidateEnergy = candidate.getTotalEnergy();
+							candidateMomentum = candidate.getMomentum();
 						} else {
 							// Can't use feature
 						}
+					}
+
+					// Performing step callback - data saving, batch simulation auto-managing
+					if (dt <= Settings.MIN_DT) {
+						RealGas.frame.stepCallback(candidate);
 					}
 
 					return null;
@@ -124,11 +122,17 @@ public class RealGas {
 //				new GeometricVector3D(Settings.CONTINUUM_MAX_X, Settings.CONTINUUM_MAX_Y, Settings.CONTINUUM_MAX_Z),
 //				random::nextDouble);
 		final Supplier<Double> declination = () -> Math.acos((random.nextDouble() * 2) - 1);
-		final Supplier<GeometricVector3D> velocity = GeometricVector3D.generatorSetLength(0.235819090966867d,
-				random::nextDouble, declination);
-//		final Supplier<ContinuumParticle3D> particle = ContinuumParticle3D.creator(position, velocity);
+		Supplier<Double> speedDist = null;
+		if (Settings.FIXED_SPEED) {
+			speedDist = () -> Settings.FIXED_SPEED_LENGTH;
+		} else if (Settings.RANDOM_SPEED) {
+			speedDist = () -> random.nextDouble() * Settings.MAX_RANDOM_SPEED;
+		}
+		final Supplier<GeometricVector3D> velocity = GeometricVector3D.generatorSetLength(speedDist, random::nextDouble,
+				declination);
 
-		// Creating integration policy
+		// Creating integration policy - algorythm to integrate
+		//TODO change to reactForce method
 		final IntegrationPolicy<Double, GeometricVector3D> integrationPolicy = (t, dt, p, vs) -> {
 			GeometricVector3D res = new GeometricVector3D();
 			int derivNo = 1;
@@ -138,7 +142,6 @@ public class RealGas {
 				derivNo++;
 				factorial *= derivNo;
 			}
-//			System.out.println("Returning: " + res + " for " + vs.iterator().next());
 			return res;
 		};
 
@@ -147,14 +150,14 @@ public class RealGas {
 			PositionGenerator<GeometricVector3D> position = new PositionGenerator<GeometricVector3D>(
 					GeometricVector3D.ZERO,
 					new GeometricVector3D(Settings.CONTINUUM_MAX_X, Settings.CONTINUUM_MAX_Y, Settings.CONTINUUM_MAX_Z),
-					random::nextDouble, 150.0d, true);
+					random::nextDouble, 100.0d, true);
 			Supplier<ContinuumParticle3D> particle = ContinuumParticle3D.creator(position::getNextPos, velocity);
 
 			// Creating array and filling it with particles
 			ArrayList<ContinuumParticle3D> particles = new ArrayList<ContinuumParticle3D>(0);
 			Stream.generate(particle).limit(Settings.PARTICLES).peek(p -> particles.add(p)).count();
 
-			// Creating system - object that holds all particles and defines usefull methods
+			// Creating system - object that holds all particles and defines useful methods
 			// to interact with system
 			ParticleSystem<GeometricVector3D, ContinuumParticle3D> system = new ParticleSystem<GeometricVector3D, ContinuumParticle3D>(
 					particles, integrationPolicy, integrationPolicy, GeometricVector3D::new);
@@ -164,7 +167,7 @@ public class RealGas {
 					system, Settings.DT, checker, () -> true, s -> {
 					});
 		};
-//		simulator.start(); // simulator is daemon, so JVM shuts down if no other thread is active
+		// Simulator is daemon, so JVM shuts down if no other thread is active
 
 		SwingUtilities.invokeLater(() -> {
 			RealGas.frame = new RealGasFrame(sup);

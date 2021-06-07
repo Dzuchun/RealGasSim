@@ -29,7 +29,7 @@ public interface Particle<T extends GeometricVector> {
 	 */
 	public abstract T getForceOn(Particle<T> particle);
 
-	public abstract double getPotential(Particle<T> particle);
+	public abstract double getPotentialEnergy(Particle<T> particle);
 
 	public abstract double getMass();
 

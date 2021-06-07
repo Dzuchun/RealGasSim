@@ -52,6 +52,66 @@ public class ContinuumParticle3D extends Particle3D {
 		return relativePos;
 	}
 
+	@Override
+	public GeometricVector3D getForceOn(Particle<GeometricVector3D> particle) {
+		if (particle == this) {
+			return new GeometricVector3D();
+		}
+		if (Settings.CONTINUUM_ATTRACTION) {
+			GeometricVector3D basePos = getRelativePos(particle);
+			GeometricVector3D res = new GeometricVector3D();
+			int iterations = Settings.CONTINUUM_ATTRACTION_ITERATIONS;
+			double[] continuumProps = { CONTINUUM_X.get(), CONTINUUM_Y.get(), CONTINUUM_Z.get() };
+			int specCoords[] = { -iterations, -iterations, -iterations };
+			for (; specCoords[0] <= iterations; specCoords[0]++) {
+				specCoords[1] = -iterations;
+				for (; specCoords[1] <= iterations; specCoords[1]++) {
+					specCoords[2] = -iterations;
+					for (; specCoords[2] <= iterations; specCoords[2]++) {
+						GeometricVector3D currentPos = (GeometricVector3D) basePos.createClone();
+						for (int i = 0; i < 3; i++) {
+							currentPos.addToCoord(i, specCoords[i] * continuumProps[i]);
+						}
+						res.add(getForceOnInternal(currentPos), false);
+					}
+				}
+			}
+			return (GeometricVector3D) res.scale(particle.getMass(), false);
+		} else {
+			return super.getForceOn(particle);
+		}
+	}
+
+	@Override
+	public double getPotentialEnergy(Particle<GeometricVector3D> particle) {
+		if (particle == this) {
+			return 0.0d;
+		}
+		if (Settings.CONTINUUM_ATTRACTION) {
+			GeometricVector3D basePos = getRelativePos(particle);
+			double res = 0.0d;
+			int iterations = Settings.CONTINUUM_ATTRACTION_ITERATIONS;
+			double[] continuumProps = { CONTINUUM_X.get(), CONTINUUM_Y.get(), CONTINUUM_Z.get() };
+			int specCoords[] = { -iterations, -iterations, -iterations };
+			for (; specCoords[0] <= iterations; specCoords[0]++) {
+				specCoords[1] = -iterations;
+				for (; specCoords[1] <= iterations; specCoords[1]++) {
+					specCoords[2] = -iterations;
+					for (; specCoords[2] <= iterations; specCoords[2]++) {
+						GeometricVector3D currentPos = (GeometricVector3D) basePos.createClone();
+						for (int i = 0; i < 3; i++) {
+							currentPos.addToCoord(i, specCoords[i] * continuumProps[i]);
+						}
+						res += getPotentialInternal(currentPos);
+					}
+				}
+			}
+			return res*particle.getMass();
+		} else {
+			return super.getPotentialEnergy(particle);
+		}
+	}
+
 	protected void reactBounds() {
 		double v, c;
 		for (int i = 0; i < 3; i++) {

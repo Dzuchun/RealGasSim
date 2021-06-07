@@ -10,6 +10,7 @@ import java.awt.Font;
 import java.awt.GridLayout;
 import java.awt.event.ActionEvent;
 import java.util.ArrayList;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
@@ -22,6 +23,8 @@ import javax.swing.JPanel;
 import javax.swing.JTextField;
 import javax.swing.SwingConstants;
 import javax.swing.WindowConstants;
+
+import org.apache.poi.ss.usermodel.Cell;
 
 import dzuchun.lib.io.DoubleResult;
 import dzuchun.lib.io.SpreadsheetHelper;
@@ -45,7 +48,9 @@ public class RealGasFrame extends JFrame {
 	private static final String[] START_BUTTON_MESSAGES = { "Start new", "Pause", "Resume" };
 	private JButton endButton;
 	private JButton saveButton;
-	private SabializingNote simSpeedField;
+	private StabializingNote simSpeedField;
+	private FormattedNote<Double> currentTime;
+	private FormattedNote<Double> energyRatio;
 
 	// RightPanel elements
 	private JTextField timeField;
@@ -65,7 +70,7 @@ public class RealGasFrame extends JFrame {
 	// Savedata fields
 	private static final String[] PARAMETER_NAMES = { "Time", "Kinetic Energy", "Potential Energy", "Total Energy",
 			"Simulation №", "Begin Energy", "End Reason", "Velocity x", "Velocity y", "Velocity z", "Particles",
-			"Velocity Distribution", "Min distance", "Velocity Distribution (Meaned)" };
+			"Velocity Distribution", "Min distance", "Velocity Distribution (Meaned)", "Mean Distance" };
 	private Result result;
 	private ArrayList<Result> tmpResult;
 
@@ -123,7 +128,9 @@ public class RealGasFrame extends JFrame {
 					}
 				});
 				saveButton.setEnabled(false);
-				this.add(simSpeedField = new SabializingNote("%.2f t/m", 10));
+				this.add(simSpeedField = new StabializingNote("%.2f t/m", 10));
+				this.add(currentTime = new FormattedNote<Double>("%.2f t", 0.0d));
+				this.add(energyRatio = new FormattedNote<Double>("%.4f", 1.0d));
 			}
 		}, BorderLayout.PAGE_END);
 		pane.add(new JPanel() {
@@ -244,17 +251,20 @@ public class RealGasFrame extends JFrame {
 		}
 	}
 
-	private static class SabializingNote extends Note {
+	private static class StabializingNote extends Note {
 		private static final long serialVersionUID = 1L;
 
 		private String format;
 		private double[] buffer;
 		private int index;
 
-		public SabializingNote(String formatIn, int bufferSizeIn) {
+		public StabializingNote(String formatIn, int bufferSizeIn) {
 			super(String.format(formatIn, 0.0d));
 			format = formatIn;
 			buffer = new double[bufferSizeIn];
+			for (int i = 1; i < bufferSizeIn; i++) {
+				buffer[i] = Double.NaN;
+			}
 			index = 0;
 		}
 
@@ -266,16 +276,39 @@ public class RealGasFrame extends JFrame {
 
 		public void clearBuffer() {
 			buffer = new double[buffer.length];
+			for (int i = 1; i < buffer.length; i++) {
+				buffer[i] = Double.NaN;
+			}
 			updateDisplay();
 		}
 
 		public void updateDisplay() {
 			double res = 0;
+			int n = 0;
 			for (double d : buffer) {
-				res += d;
+				if (!Double.isNaN(d)) {
+					res += d;
+					n++;
+				}
 			}
-			res /= buffer.length;
+			res /= n;
 			setText(String.format(format, res));
+		}
+
+	}
+
+	public class FormattedNote<T> extends Note {
+		private static final long serialVersionUID = 1L;
+
+		private String format;
+
+		public FormattedNote(String formatIn, T firstInput) {
+			super(String.format(formatIn, firstInput));
+			this.format = formatIn;
+		}
+
+		public void setValue(T value) {
+			this.setText(String.format(format, value));
 		}
 
 	}
@@ -352,6 +385,8 @@ public class RealGasFrame extends JFrame {
 //		}
 		beginBatch.setEnabled(true);
 		simSpeedField.clearBuffer();
+		currentTime.setValue(0.0d);
+		energyRatio.setValue(1.0d);
 	}
 
 	private double lastSaveRealTime = System.currentTimeMillis();
@@ -363,6 +398,8 @@ public class RealGasFrame extends JFrame {
 	private DistributionResultGenerator<Double> veldistGeneratorD = new DistributionResultGenerator<Double>(
 			Settings.DISTRIBUTION_SIZE,
 			n -> String.format("v=[%.2f, %.2f]", n * Settings.DISTRIBUTION_STEP, (n + 1) * Settings.DISTRIBUTION_STEP));
+	private BiConsumer<Integer, Cell> writeFunctionIntegers = (v, c) -> c.setCellValue((double) v);
+	private BiConsumer<Double, Cell> writeFunctionDouble = (v, c) -> c.setCellValue(v);
 
 	public void stepCallback(ParticleSystem<GeometricVector3D, ContinuumParticle3D> stateIn) {
 		// Saving
@@ -375,6 +412,8 @@ public class RealGasFrame extends JFrame {
 				double currentRealTime = System.currentTimeMillis();
 				double simS = ((currentTime - lastSave) / (currentRealTime - lastSaveRealTime)) * 60000.0d;
 				simSpeedField.addValue(simS);
+				this.currentTime.setValue(currentTime);
+				energyRatio.setValue(stateIn.getTotalEnergy() / beginEnergy);
 				lastSaveRealTime = currentRealTime;
 				lastSave = currentTime;
 
@@ -399,7 +438,8 @@ public class RealGasFrame extends JFrame {
 					for (int i = 0; i < distrib.length; i++) {
 						distribIntegers[i] = distrib[i];
 					}
-					resu.append(RealGasFrame.PARAMETER_NAMES[11], veldistGenerator.generate(distribIntegers));
+					resu.append(RealGasFrame.PARAMETER_NAMES[11],
+							veldistGenerator.generate(distribIntegers, writeFunctionIntegers));
 					// Adding minimum distance
 					final double maxDistance = 10 * Settings.CONTINUUM_MAX_X;
 					resu.append(RealGasFrame.PARAMETER_NAMES[12], new DoubleResult(stateIn.calculateParameter(p1 -> {
@@ -421,7 +461,7 @@ public class RealGasFrame extends JFrame {
 				} else {
 					result.append(RealGasFrame.PARAMETER_NAMES[0], new DoubleResult(currentTime));
 					// Adding particles
-					result.append(RealGasFrame.PARAMETER_NAMES[12], new DoubleResult((double) stateIn.size()));
+					result.append(RealGasFrame.PARAMETER_NAMES[10], new DoubleResult((double) stateIn.size()));
 					// Adding energies
 					double kEnergy, uEnergy;
 					result.append(RealGasFrame.PARAMETER_NAMES[1],
@@ -442,10 +482,22 @@ public class RealGasFrame extends JFrame {
 							if (dist < res) {
 								res = dist;
 							}
-							return res;
 						}
-						return 0.0d;
+						return res;
 					}, Math::min, maxDistance)));
+					// Adding mean distance
+					result.append(RealGasFrame.PARAMETER_NAMES[14], new DoubleResult(stateIn.calculateParameter(p1 -> {
+						int size = stateIn.size();
+						double res = 0.0d;
+						for (int i = 0; i < size; i++) {
+							ContinuumParticle3D p2 = stateIn.get(i);
+							if (p1.equals(p2)) {
+								continue;
+							}
+							res += p1.getRelativePos(p2).getLength();
+						}
+						return res / size;
+					}, Double::sum, 0.0d) / stateIn.size()));
 					// Adding veldist
 					int[] distrib = stateIn.distributeVelocity(d -> (int) (d / Settings.DISTRIBUTION_STEP),
 							Settings.DISTRIBUTION_SIZE);
@@ -454,11 +506,14 @@ public class RealGasFrame extends JFrame {
 						distribIntegers[i] = distrib[i];
 					}
 					@SuppressWarnings("rawtypes")
-					DistributionResult velDist = veldistGenerator.generate(distribIntegers);
+					DistributionResult velDist = veldistGenerator.generate(distribIntegers, writeFunctionIntegers);
 					if (Settings.ENABLE_GAUSSIAN_MEAN) {
 						// Applying gaussian blur
-						velDist = veldistGeneratorD.generate(MathUtil.applyGaussianBlur(velDist.data(), Settings.SIGMA,
-								d -> (double) (int) d, d -> d, new Double[Settings.DISTRIBUTION_SIZE]));
+						velDist = veldistGeneratorD
+								.generate(
+										MathUtil.applyGaussianBlur(velDist.data(), Settings.SIGMA,
+												d -> (double) (int) d, d -> d, new Double[Settings.DISTRIBUTION_SIZE]),
+										writeFunctionDouble);
 						result.append(RealGasFrame.PARAMETER_NAMES[13], velDist);
 					} else {
 						result.append(RealGasFrame.PARAMETER_NAMES[11], velDist);
@@ -542,7 +597,7 @@ public class RealGasFrame extends JFrame {
 			DistributionResult velDist = distributionParameter.get(distributionParameter.size() - 1);
 			if (Settings.ENABLE_GAUSSIAN_MEAN) {
 				velDist = veldistGeneratorD.generate(MathUtil.applyGaussianBlur(velDist.data(), Settings.SIGMA,
-						d -> (double) (int) d, d -> d, new Double[Settings.DISTRIBUTION_SIZE]));
+						d -> (double) (int) d, d -> d, new Double[Settings.DISTRIBUTION_SIZE]), writeFunctionDouble);
 				result.append(RealGasFrame.PARAMETER_NAMES[13], velDist);
 			} else {
 				result.append(RealGasFrame.PARAMETER_NAMES[11], velDist);

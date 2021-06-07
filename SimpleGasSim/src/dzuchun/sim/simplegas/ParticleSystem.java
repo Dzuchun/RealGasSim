@@ -37,26 +37,33 @@ public class ParticleSystem<V extends GeometricVector, T extends Particle<V>> ex
 		this.positionPolicy = positionPolicyIn;
 		this.speedPolicy = speedPolicyIn;
 		this.zeroPosFactory = zeroPosFactoryIn;
+		// TODO add check if V is correctly implementing vector operations
 	}
 
 	public double getKineticEnergy() {
 		double res = 0;
 		for (T p : this) {
-//			if (p.kineticEnergy() > 1000.0d) {
-//				p=p;
-//			}
 			res += p.kineticEnergy();
 		}
 		return res;
-//		return parallelStream().mapToDouble(Particle::kineticEnergy).sum();
+//		V mom = this.getMomentum();
+//		double mass = 0.0d;
+//		for (T p : this) {
+//			mass += p.getMass();
+//		}
+//		return mom.dotProduct(mom) / (2.0d * mass);
 	}
 
 	public double getUEnergy() {
 		double res = 0;
-		for (T p1 : this) {
-			for (T p2 : this) {
-				if (p1 != p2) {
-					res += p1.getPotential(p2) / 2.0d;
+		int size = this.size();
+		for (int i = 0; i < size; i++) {
+			T p1 = this.get(i);
+			for (int j = 0; j < size; j++) {
+				if (i != j) {
+					T p2 = this.get(j);
+					// TODO figure out, if I should divide!
+					res += p1.getPotentialEnergy(p2);
 				}
 			}
 		}
@@ -73,6 +80,18 @@ public class ParticleSystem<V extends GeometricVector, T extends Particle<V>> ex
 			res.add(p.getSpeed().scale(p.getMass(), true), false);
 		}
 		return res;
+	}
+
+	@SuppressWarnings("unchecked")
+	public V getForceFor(T particle) {
+		double mass = particle.getMass();
+		V force = zeroPosFactory.get();
+		for (T p1 : this) {
+			// Here was condition such that particles should not be the same, but it was
+			// deleted to allow even crazier systems
+			force.add(p1.getForceOn(particle), false);
+		}
+		return (V) force.scale(1.0d / mass, false);
 	}
 
 	@SuppressWarnings("unchecked")
@@ -109,58 +128,56 @@ public class ParticleSystem<V extends GeometricVector, T extends Particle<V>> ex
 		 * @param delta     Parameter delta
 		 * @return Value change.
 		 */
+		// TODO change to suit Verlet
 		public V integrate(P parameter, P delta, V current, Iterable<V> derivs);
 	}
 
 	@Override
 	public void advance(Double dt) {
+		@SuppressWarnings("unused")
 		double mass;
 		LinkedHashMap<T, V> assignedForces = new LinkedHashMap<T, V>(0);
 		V force;
 		for (T p : this) {
-			mass = p.getMass();
-			force = zeroPosFactory.get();
-			for (T p1 : this) {
-				if (p == p1) {
-					continue;
-				}
-				V force1 = p1.getForceOn(p);
-				force.add(force1, false);
-			}
-			force.scale(1 / mass, false);
-			assignedForces.put(p, force);
-//			p.stepAccelerate(speedPolicy.integrate(time, dt, p.getSpeed(), Arrays.asList(force)));
-		}
-//		for (T p : this) {
-//			p.stepMove(positionPolicy.integrate(time, dt, p.getPosition(), Arrays.asList(p.getSpeed())));
-//		}
-
-		// Belong to feature below
-		double dt2d2 = (dt * dt) / 2;
-		double ddt = 1 / dt;
-		for (Entry<T, V> e : assignedForces.entrySet()) {
-			/*
-			 * Beta-feature: Verlet integration
-			 * https://en.wikipedia.org/wiki/Verlet_integration
-			 */
-			if (Settings.VERLET_INTEGRATION) {
-				T p = e.getKey();
-				@SuppressWarnings("unchecked")
-				V move = (V) p.getLastPos().scale(-1.0d, true).add(p.getPosition(), false)
-						.add(e.getValue().scale(dt2d2, false), false);
-				p.stepMove(move);
-				@SuppressWarnings("unchecked")
-				V tmp = (V) p.getSpeed().scale(-1.0d, true).add(move.scale(ddt, false), false);
-				p.stepAccelerate(tmp);
+			force = getForceFor(p);
+			if (Settings.SEQUENCED_REACTION) {
+				reactToForce(p, force, dt);
 			} else {
+				assignedForces.put(p, force);
+			}
+		}
+		if (!Settings.SEQUENCED_REACTION) {
 
-				e.getKey().stepMove(positionPolicy.integrate(time, dt, e.getKey().getPosition(),
-						Arrays.asList(e.getKey().getSpeed(), e.getValue())));
-				e.getKey().stepAccelerate(
-						speedPolicy.integrate(time, dt, e.getKey().getSpeed(), Arrays.asList(e.getValue())));
+			// Belong to feature below
+//			double dt2d2 = (dt * dt) / 2;
+//			double ddt = 1 / dt; 
+//			:(
+
+			for (Entry<T, V> e : assignedForces.entrySet()) {
+				/*
+				 * Beta-feature: Verlet integration
+				 * https://en.wikipedia.org/wiki/Verlet_integration
+				 */
+				reactToForce(e.getKey(), e.getValue(), dt);
 			}
 		}
 		time += dt;
+	}
+
+	private void reactToForce(T particle, V force, double dt) {
+		if (Settings.VERLET_INTEGRATION) {
+			@SuppressWarnings("unchecked")
+			V move = (V) particle.getLastPos().scale(-1.0d, true).add(particle.getPosition(), false)
+					.add(force.scale(dt * dt / 2, false), false);
+			particle.stepMove(move);
+			@SuppressWarnings("unchecked")
+			V tmp = (V) particle.getSpeed().scale(-1.0d, true).add(move.scale(1 / dt, false), false);
+			particle.stepAccelerate(tmp);
+		} else {
+			particle.stepMove(positionPolicy.integrate(time, dt, particle.getPosition(),
+					Arrays.asList(particle.getSpeed(), force)));
+			particle.stepAccelerate(speedPolicy.integrate(time, dt, particle.getSpeed(), Arrays.asList(force)));
+		}
 	}
 
 	public int[] distributeVelocity(Function<Double, Integer> distributor, int distLength) {

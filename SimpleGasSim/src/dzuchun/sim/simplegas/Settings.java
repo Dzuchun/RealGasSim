@@ -82,4 +82,11 @@ public class Settings {
 	public static final int CONTINUUM_ATTRACTION_ITERATIONS = (int) (long) Settings.FEATURES
 			.get("continuum_attraction_iterations");
 	public static final boolean VERLET_INTEGRATION = (boolean) Settings.FEATURES.get("verlet_integration");
+	public static final boolean SEQUENCED_REACTION = (boolean) Settings.FEATURES.get("sequenced_reaction");
+	// Start conditions
+	private static final JSONObject START_CONDITIONS = (JSONObject) Settings.PROPERTIES_OBJECT.get("start_conditions");
+	public static final boolean FIXED_SPEED = (boolean) Settings.START_CONDITIONS.get("fixed_speed");
+	public static final double FIXED_SPEED_LENGTH = (double) Settings.START_CONDITIONS.get("fixed_speed_length");
+	public static final boolean RANDOM_SPEED = (boolean) Settings.START_CONDITIONS.get("random_speed");
+	public static final double MAX_RANDOM_SPEED = (double) Settings.START_CONDITIONS.get("max_random_speed");
 }
