@@ -3,6 +3,7 @@ package dzuchun.sim.simplegas;
 import java.util.function.Supplier;
 
 import dzuchun.lib.math.GeometricVector3D;
+import dzuchun.lib.math.MultiplicativeMatrix;
 
 public class ContinuumParticle3D extends Particle3D {
 
@@ -35,7 +36,7 @@ public class ContinuumParticle3D extends Particle3D {
 		reactBounds();
 
 		// Belong to verlet integration feature
-		lastPos = (GeometricVector3D) speed.scale(-Settings.DT, true).add(this, false);
+		lastPos = (GeometricVector3D) speed.multiply(-Settings.DT, true).add(this, false);
 	}
 
 	@Override
@@ -53,36 +54,6 @@ public class ContinuumParticle3D extends Particle3D {
 	}
 
 	@Override
-	public GeometricVector3D getForceOn(Particle<GeometricVector3D> particle) {
-		if (particle == this) {
-			return new GeometricVector3D();
-		}
-		if (Settings.CONTINUUM_ATTRACTION) {
-			GeometricVector3D basePos = getRelativePos(particle);
-			GeometricVector3D res = new GeometricVector3D();
-			int iterations = Settings.CONTINUUM_ATTRACTION_ITERATIONS;
-			double[] continuumProps = { CONTINUUM_X.get(), CONTINUUM_Y.get(), CONTINUUM_Z.get() };
-			int specCoords[] = { -iterations, -iterations, -iterations };
-			for (; specCoords[0] <= iterations; specCoords[0]++) {
-				specCoords[1] = -iterations;
-				for (; specCoords[1] <= iterations; specCoords[1]++) {
-					specCoords[2] = -iterations;
-					for (; specCoords[2] <= iterations; specCoords[2]++) {
-						GeometricVector3D currentPos = (GeometricVector3D) basePos.createClone();
-						for (int i = 0; i < 3; i++) {
-							currentPos.addToCoord(i, specCoords[i] * continuumProps[i]);
-						}
-						res.add(getForceOnInternal(currentPos), false);
-					}
-				}
-			}
-			return (GeometricVector3D) res.scale(particle.getMass(), false);
-		} else {
-			return super.getForceOn(particle);
-		}
-	}
-
-	@Override
 	public double getPotentialEnergy(Particle<GeometricVector3D> particle) {
 		if (particle == this) {
 			return 0.0d;
@@ -91,7 +62,8 @@ public class ContinuumParticle3D extends Particle3D {
 			GeometricVector3D basePos = getRelativePos(particle);
 			double res = 0.0d;
 			int iterations = Settings.CONTINUUM_ATTRACTION_ITERATIONS;
-			double[] continuumProps = { CONTINUUM_X.get(), CONTINUUM_Y.get(), CONTINUUM_Z.get() };
+			double[] continuumProps = { ContinuumParticle3D.CONTINUUM_X.get(), ContinuumParticle3D.CONTINUUM_Y.get(),
+					ContinuumParticle3D.CONTINUUM_Z.get() };
 			int specCoords[] = { -iterations, -iterations, -iterations };
 			for (; specCoords[0] <= iterations; specCoords[0]++) {
 				specCoords[1] = -iterations;
@@ -106,17 +78,79 @@ public class ContinuumParticle3D extends Particle3D {
 					}
 				}
 			}
-			return res*particle.getMass();
+			return res * particle.getMass();
 		} else {
 			return super.getPotentialEnergy(particle);
+		}
+	}
+
+	@Override
+	public GeometricVector3D getForceOn(Particle<GeometricVector3D> particle) {
+		if (particle == this) {
+			return new GeometricVector3D();
+		}
+		if (Settings.CONTINUUM_ATTRACTION) {
+			GeometricVector3D basePos = getRelativePos(particle);
+			GeometricVector3D res = new GeometricVector3D();
+			int iterations = Settings.CONTINUUM_ATTRACTION_ITERATIONS;
+			double[] continuumProps = { ContinuumParticle3D.CONTINUUM_X.get(), ContinuumParticle3D.CONTINUUM_Y.get(),
+					ContinuumParticle3D.CONTINUUM_Z.get() };
+			int specCoords[] = { -iterations, -iterations, -iterations };
+			for (; specCoords[0] <= iterations; specCoords[0]++) {
+				specCoords[1] = -iterations;
+				for (; specCoords[1] <= iterations; specCoords[1]++) {
+					specCoords[2] = -iterations;
+					for (; specCoords[2] <= iterations; specCoords[2]++) {
+						GeometricVector3D currentPos = (GeometricVector3D) basePos.createClone();
+						for (int i = 0; i < 3; i++) {
+							currentPos.addToCoord(i, specCoords[i] * continuumProps[i]);
+						}
+						res.add(getForceOnInternal(currentPos), false);
+					}
+				}
+			}
+			return (GeometricVector3D) res.multiply(particle.getMass(), false);
+		} else {
+			return super.getForceOn(particle);
+		}
+	}
+
+	@Override
+	public MultiplicativeMatrix<Double> getForceJakobi(Particle<GeometricVector3D> particle) {
+		if ((particle == this) || !Settings.USE_FORCE_JAKOBI) {
+			return MultiplicativeMatrix.getZeroDoubleMatrix(3, 3);
+		}
+		if (Settings.CONTINUUM_ATTRACTION) {
+			GeometricVector3D basePos = getRelativePos(particle);
+			MultiplicativeMatrix<Double> res = MultiplicativeMatrix.getZeroDoubleMatrix(3, 3);
+			int iterations = Settings.CONTINUUM_ATTRACTION_ITERATIONS;
+			double[] continuumProps = { ContinuumParticle3D.CONTINUUM_X.get(), ContinuumParticle3D.CONTINUUM_Y.get(),
+					ContinuumParticle3D.CONTINUUM_Z.get() };
+			int specCoords[] = { -iterations, -iterations, -iterations };
+			for (; specCoords[0] <= iterations; specCoords[0]++) {
+				specCoords[1] = -iterations;
+				for (; specCoords[1] <= iterations; specCoords[1]++) {
+					specCoords[2] = -iterations;
+					for (; specCoords[2] <= iterations; specCoords[2]++) {
+						GeometricVector3D currentPos = (GeometricVector3D) basePos.createClone();
+						for (int i = 0; i < 3; i++) {
+							currentPos.addToCoord(i, specCoords[i] * continuumProps[i]);
+						}
+						res.add(getForceJakobiInternal(currentPos), false);
+					}
+				}
+			}
+			return res.multiply(particle.getMass(), false);
+		} else {
+			return super.getForceJakobi(particle);
 		}
 	}
 
 	protected void reactBounds() {
 		double v, c;
 		for (int i = 0; i < 3; i++) {
-			v = this.getCoord(i);
-			c = getContinuumProperty(i).get();
+			v = getCoord(i);
+			c = ContinuumParticle3D.getContinuumProperty(i).get();
 			if (v < 0) {
 				addToCoord(i, c);
 				lastPos.addToCoord(i, c);
@@ -137,7 +171,7 @@ public class ContinuumParticle3D extends Particle3D {
 
 	@Override
 	public ContinuumParticle3D copy() {
-		ContinuumParticle3D res = new ContinuumParticle3D(coords.get(0), coords.get(1), coords.get(2));
+		ContinuumParticle3D res = new ContinuumParticle3D(coords().get(0), coords().get(1), coords().get(2));
 		res.speed = getSpeed();
 
 		// Belong to Verlet integration

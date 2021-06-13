@@ -35,6 +35,10 @@ public class Settings {
 	public static final boolean ENABLE_GAUSSIAN_MEAN = (boolean) Settings.GRAPHICS_PROPERTIES
 			.get("enable_Gaussian_mean");
 	public static final double GAUSSIAN_SIGMA = (double) Settings.GRAPHICS_PROPERTIES.get("gaussian_sigma");
+	public static final boolean ENABLE_BATCH_AVERAGE = (boolean) Settings.GRAPHICS_PROPERTIES
+			.get("enable_batch_average");
+	public static final double BATCH_AVERAGE_MIN_TIME = (double) Settings.GRAPHICS_PROPERTIES
+			.get("batch_average_min_time");
 	// Mech
 	private static final JSONObject MECH_PROPERTIES = (JSONObject) Settings.PROPERTIES_OBJECT.get("mech");
 	public static final double MASS = (double) Settings.MECH_PROPERTIES.get("mass");
@@ -83,6 +87,7 @@ public class Settings {
 			.get("continuum_attraction_iterations");
 	public static final boolean VERLET_INTEGRATION = (boolean) Settings.FEATURES.get("verlet_integration");
 	public static final boolean SEQUENCED_REACTION = (boolean) Settings.FEATURES.get("sequenced_reaction");
+	public static final boolean USE_FORCE_JAKOBI = (boolean) Settings.FEATURES.get("use_force_jakobi");
 	// Start conditions
 	private static final JSONObject START_CONDITIONS = (JSONObject) Settings.PROPERTIES_OBJECT.get("start_conditions");
 	public static final boolean FIXED_SPEED = (boolean) Settings.START_CONDITIONS.get("fixed_speed");

@@ -108,9 +108,7 @@ public class RealGas {
 					}
 
 					// Performing step callback - data saving, batch simulation auto-managing
-					if (dt <= Settings.MIN_DT) {
-						RealGas.frame.stepCallback(candidate);
-					}
+					RealGas.frame.stepCallback(candidate);
 
 					return null;
 				}
@@ -132,13 +130,13 @@ public class RealGas {
 				declination);
 
 		// Creating integration policy - algorythm to integrate
-		//TODO change to reactForce method
+		// TODO change to reactForce method
 		final IntegrationPolicy<Double, GeometricVector3D> integrationPolicy = (t, dt, p, vs) -> {
 			GeometricVector3D res = new GeometricVector3D();
 			int derivNo = 1;
 			int factorial = 1;
 			for (GeometricVector3D deriv : vs) {
-				res.add(deriv.scale(Math.pow(dt, derivNo) / factorial, true), false);
+				res.add(deriv.multiply(Math.pow(dt, derivNo) / factorial, true), false);
 				derivNo++;
 				factorial *= derivNo;
 			}
@@ -164,7 +162,7 @@ public class RealGas {
 
 			// Creating simulator - thread that performs simulation logic and callbacks
 			return new Simulator<ParticleSystem<GeometricVector3D, ContinuumParticle3D>, Double, ParticleSystem.SimpleChecker<GeometricVector3D, ContinuumParticle3D>>(
-					system, Settings.DT, checker, () -> true, s -> {
+					system, Settings.DT, checker, s -> true, s -> {
 					});
 		};
 		// Simulator is daemon, so JVM shuts down if no other thread is active

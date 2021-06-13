@@ -10,6 +10,7 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 
 import dzuchun.lib.math.GeometricVector;
+import dzuchun.lib.math.MultiplicativeMatrix;
 import dzuchun.lib.sim.ISimulatable;
 
 public class ParticleSystem<V extends GeometricVector, T extends Particle<V>> extends ArrayList<T>
@@ -56,12 +57,12 @@ public class ParticleSystem<V extends GeometricVector, T extends Particle<V>> ex
 
 	public double getUEnergy() {
 		double res = 0;
-		int size = this.size();
+		int size = size();
 		for (int i = 0; i < size; i++) {
-			T p1 = this.get(i);
+			T p1 = get(i);
 			for (int j = 0; j < size; j++) {
 				if (i != j) {
-					T p2 = this.get(j);
+					T p2 = get(j);
 					// TODO figure out, if I should divide!
 					res += p1.getPotentialEnergy(p2);
 				}
@@ -77,21 +78,28 @@ public class ParticleSystem<V extends GeometricVector, T extends Particle<V>> ex
 	public V getMomentum() {
 		V res = this.zeroPosFactory.get();
 		for (T p : this) {
-			res.add(p.getSpeed().scale(p.getMass(), true), false);
+			res.add(p.getSpeed().multiply(p.getMass(), true), false);
 		}
 		return res;
 	}
 
 	@SuppressWarnings("unchecked")
 	public V getForceFor(T particle) {
-		double mass = particle.getMass();
 		V force = zeroPosFactory.get();
 		for (T p1 : this) {
 			// Here was condition such that particles should not be the same, but it was
 			// deleted to allow even crazier systems
 			force.add(p1.getForceOn(particle), false);
 		}
-		return (V) force.scale(1.0d / mass, false);
+		return (V) force.multiply(1.0d / particle.getMass(), false);
+	}
+
+	public MultiplicativeMatrix<Double> getJakobiFor(T particle) {
+		MultiplicativeMatrix<Double> res = get(0).getForceJakobi(particle);
+		for (int i = 1; i < size(); i++) {
+			res.add(get(i).getForceJakobi(particle), false);
+		}
+		return res.multiply(1.0d / particle.getMass(), false);
 	}
 
 	@SuppressWarnings("unchecked")
@@ -137,20 +145,25 @@ public class ParticleSystem<V extends GeometricVector, T extends Particle<V>> ex
 		@SuppressWarnings("unused")
 		double mass;
 		LinkedHashMap<T, V> assignedForces = new LinkedHashMap<T, V>(0);
+		LinkedHashMap<T, MultiplicativeMatrix<Double>> assignedJakobi = new LinkedHashMap<T, MultiplicativeMatrix<Double>>(
+				0);
 		V force;
+		MultiplicativeMatrix<Double> jakobi;
 		for (T p : this) {
 			force = getForceFor(p);
+			jakobi = getJakobiFor(p);
 			if (Settings.SEQUENCED_REACTION) {
-				reactToForce(p, force, dt);
+				reactToForce(p, dt, force, jakobi);
 			} else {
 				assignedForces.put(p, force);
+				assignedJakobi.put(p, jakobi);
 			}
 		}
 		if (!Settings.SEQUENCED_REACTION) {
 
 			// Belong to feature below
 //			double dt2d2 = (dt * dt) / 2;
-//			double ddt = 1 / dt; 
+//			double ddt = 1 / dt;
 //			:(
 
 			for (Entry<T, V> e : assignedForces.entrySet()) {
@@ -158,25 +171,28 @@ public class ParticleSystem<V extends GeometricVector, T extends Particle<V>> ex
 				 * Beta-feature: Verlet integration
 				 * https://en.wikipedia.org/wiki/Verlet_integration
 				 */
-				reactToForce(e.getKey(), e.getValue(), dt);
+				T p = e.getKey();
+				reactToForce(p, dt, e.getValue(), assignedJakobi.get(p));
 			}
 		}
 		time += dt;
 	}
 
-	private void reactToForce(T particle, V force, double dt) {
+	private void reactToForce(T particle, double dt, V force, MultiplicativeMatrix<Double> jakobi) {
 		if (Settings.VERLET_INTEGRATION) {
 			@SuppressWarnings("unchecked")
-			V move = (V) particle.getLastPos().scale(-1.0d, true).add(particle.getPosition(), false)
-					.add(force.scale(dt * dt / 2, false), false);
+			V move = (V) particle.getLastPos().multiply(-1.0d, true).add(particle.getPosition(), false)
+					.add(force.multiply((dt * dt) / 2 / particle.getMass(), false), false);
 			particle.stepMove(move);
 			@SuppressWarnings("unchecked")
-			V tmp = (V) particle.getSpeed().scale(-1.0d, true).add(move.scale(1 / dt, false), false);
+			V tmp = (V) particle.getSpeed().multiply(-1.0d, true).add(move.multiply(1 / dt, false), false);
 			particle.stepAccelerate(tmp);
 		} else {
+			@SuppressWarnings("unchecked")
+			V dFdt = (V) particle.getSpeed().multiplyRight(jakobi, true);
 			particle.stepMove(positionPolicy.integrate(time, dt, particle.getPosition(),
-					Arrays.asList(particle.getSpeed(), force)));
-			particle.stepAccelerate(speedPolicy.integrate(time, dt, particle.getSpeed(), Arrays.asList(force)));
+					Arrays.asList(particle.getSpeed(), force, dFdt)));
+			particle.stepAccelerate(speedPolicy.integrate(time, dt, particle.getSpeed(), Arrays.asList(force, dFdt)));
 		}
 	}
 

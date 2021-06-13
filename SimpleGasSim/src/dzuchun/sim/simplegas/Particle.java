@@ -3,6 +3,7 @@ package dzuchun.sim.simplegas;
 import java.util.function.Supplier;
 
 import dzuchun.lib.math.GeometricVector;
+import dzuchun.lib.math.MultiplicativeMatrix;
 
 /**
  *
@@ -21,6 +22,8 @@ public interface Particle<T extends GeometricVector> {
 	};
 	public final long id = Particle.ID_SUPPLIER.get();
 
+	public abstract double getPotentialEnergy(Particle<T> particle);
+
 	/**
 	 * Defines force function for particle
 	 *
@@ -29,7 +32,10 @@ public interface Particle<T extends GeometricVector> {
 	 */
 	public abstract T getForceOn(Particle<T> particle);
 
-	public abstract double getPotentialEnergy(Particle<T> particle);
+	public default MultiplicativeMatrix<Double> getForceJakobi(Particle<T> particle) {
+		int size = particle.getPosition().dimLength;
+		return MultiplicativeMatrix.getZeroDoubleMatrix(size, size);
+	}
 
 	public abstract double getMass();
 

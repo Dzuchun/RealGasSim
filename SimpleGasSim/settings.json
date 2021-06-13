@@ -1,18 +1,20 @@
 {
 	"graph": {
 		"min_repaint_time": 30,
-		"distribution_size": 20,
-		"maximum_speed": 1.0,
+		"distribution_size": 40,
+		"maximum_speed": 2.0,
 		"enable_Gaussian_mean": false,
-		"gaussian_sigma": 0.0707
+		"gaussian_sigma": 0.0707,
+		"enable_batch_average": true,
+		"batch_average_min_time": 15.0
 	},
 	"mech": {
-		"mass": 1.0,
+		"mass": 40.0,
 		"time_unit": 0.002,
-		"max_relative_energy_change": 0.000001,
+		"max_relative_energy_change": 0.0005,
 		"critical_relative_energy_change": 1.0,
 		"max_relative_momentum_change": 0.01,
-		"time_quant": 0.002,
+		"time_quant": 0.0002,
 		"continuum_width": 34.3753816209653,
 		"continuum_height": 34.3753816209653,
 		"continuum_applicate": 34.3753816209653
@@ -25,7 +27,7 @@
 		"enable_filesave": true,
 		"saves_folder": "./saves/",
 		"filename_format": "data.xlsx",
-		"save_interval": 1.0
+		"save_interval": 0.1
 	},
 	"debug": {
 		"pause_on_critical_energy": false
@@ -34,8 +36,8 @@
 		"particles": 20
 	},
 	"gui": {
-		"default_max_time": 20.0,
-		"default_max_energy": 1.5,
+		"default_max_time": 50.1,
+		"default_max_energy": 0.1,
 		"default_simulations": 20
 	},
 	"features": {
@@ -45,12 +47,13 @@
 		"continuum_attraction_iterations": 1,
 		"_": "Folowing option requires \"time_unit\" and \"time_quant\" to be the same",
 		"verlet_integration": false,
-		"sequenced_reaction": true
+		"sequenced_reaction": true,
+		"use_force_jakobi": false
 	},
 	"start_conditions": {
 		"fixed_speed": false,
 		"fixed_speed_length": 0.235819090966867,
 		"random_speed": true,
-		"max_random_speed": 1.0
+		"max_random_speed": 0.5
 	}
 }

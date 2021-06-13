@@ -26,14 +26,14 @@ import javax.swing.WindowConstants;
 
 import org.apache.poi.ss.usermodel.Cell;
 
+import dzuchun.lib.io.DistributionResultGenerator;
+import dzuchun.lib.io.DistributionResultGenerator.DistributionResult;
 import dzuchun.lib.io.DoubleResult;
 import dzuchun.lib.io.SpreadsheetHelper;
 import dzuchun.lib.io.SpreadsheetHelper.Result;
 import dzuchun.lib.io.StringResult;
 import dzuchun.lib.math.GeometricVector3D;
 import dzuchun.lib.math.MathUtil;
-import dzuchun.lib.sim.DistributionResultGenerator;
-import dzuchun.lib.sim.DistributionResultGenerator.DistributionResult;
 import dzuchun.lib.sim.Simulator;
 import dzuchun.sim.simplegas.ParticleSystem.SimpleChecker;
 
@@ -49,8 +49,9 @@ public class RealGasFrame extends JFrame {
 	private JButton endButton;
 	private JButton saveButton;
 	private StabializingNote simSpeedField;
-	private FormattedNote<Double> currentTime;
-	private FormattedNote<Double> energyRatio;
+	private FormattedNote currentTime;
+	private FormattedNote energyRatio;
+	private FormattedNote simNoLabel;
 
 	// RightPanel elements
 	private JTextField timeField;
@@ -70,7 +71,8 @@ public class RealGasFrame extends JFrame {
 	// Savedata fields
 	private static final String[] PARAMETER_NAMES = { "Time", "Kinetic Energy", "Potential Energy", "Total Energy",
 			"Simulation №", "Begin Energy", "End Reason", "Velocity x", "Velocity y", "Velocity z", "Particles",
-			"Velocity Distribution", "Min distance", "Velocity Distribution (Meaned)", "Mean Distance" };
+			"Velocity Distribution", "Min distance", "Velocity Distribution (Meaned)", "Mean Distance",
+			"Mean Kinetic Energy" };
 	private Result result;
 	private ArrayList<Result> tmpResult;
 
@@ -117,7 +119,11 @@ public class RealGasFrame extends JFrame {
 					if (batch) {
 						mergeBatchResults();
 					}
-					SpreadsheetHelper.saveResToFile(result, Settings.SAVES_FORDER + Settings.FILENAME_FORMAT);
+					try {
+						SpreadsheetHelper.saveResToFile(result, Settings.SAVES_FORDER + Settings.FILENAME_FORMAT);
+					} catch (InterruptedException e1) {
+						e1.printStackTrace();
+					}
 					saveButton.setEnabled(false);
 				}) {
 					private static final long serialVersionUID = 1L;
@@ -129,8 +135,9 @@ public class RealGasFrame extends JFrame {
 				});
 				saveButton.setEnabled(false);
 				this.add(simSpeedField = new StabializingNote("%.2f t/m", 10));
-				this.add(currentTime = new FormattedNote<Double>("%.2f t", 0.0d));
-				this.add(energyRatio = new FormattedNote<Double>("%.4f", 1.0d));
+				this.add(energyRatio = new FormattedNote("%.4f", 1.0d));
+				this.add(currentTime = new FormattedNote("%.2f t", 0.0d));
+				this.add(simNoLabel = new FormattedNote("%d/%d", 0, 0));
 			}
 		}, BorderLayout.PAGE_END);
 		pane.add(new JPanel() {
@@ -209,6 +216,7 @@ public class RealGasFrame extends JFrame {
 					currentSim = 1;
 					onStart();
 					beginBatch.setEnabled(false);
+					simNoLabel.setText(currentSim, totalSim);
 				}) {
 					private static final long serialVersionUID = 1L;
 					{
@@ -297,17 +305,17 @@ public class RealGasFrame extends JFrame {
 
 	}
 
-	public class FormattedNote<T> extends Note {
+	public class FormattedNote extends Note {
 		private static final long serialVersionUID = 1L;
 
 		private String format;
 
-		public FormattedNote(String formatIn, T firstInput) {
+		public FormattedNote(String formatIn, Object... firstInput) {
 			super(String.format(formatIn, firstInput));
-			this.format = formatIn;
+			format = formatIn;
 		}
 
-		public void setValue(T value) {
+		public void setText(Object... value) {
 			this.setText(String.format(format, value));
 		}
 
@@ -334,6 +342,7 @@ public class RealGasFrame extends JFrame {
 			lastSave = -Settings.SAVE_INTERVAL;
 			if (batch) {
 				tmpResult.add(new Result());
+				simNoLabel.setText(currentSim, totalSim);
 			} else {
 				result = new Result();
 			}
@@ -379,14 +388,15 @@ public class RealGasFrame extends JFrame {
 		if (batch) {
 //			batch = false;
 			System.out.println("Finished sims: " + currentSim + " / " + totalSim);
+			simNoLabel.setText(0, 0);
 		}
 //		else {
 //			stepCallback(sim.getSimulation());
 //		}
 		beginBatch.setEnabled(true);
 		simSpeedField.clearBuffer();
-		currentTime.setValue(0.0d);
-		energyRatio.setValue(1.0d);
+		currentTime.setText(0.0d);
+		energyRatio.setText(1.0d);
 	}
 
 	private double lastSaveRealTime = System.currentTimeMillis();
@@ -398,7 +408,7 @@ public class RealGasFrame extends JFrame {
 	private DistributionResultGenerator<Double> veldistGeneratorD = new DistributionResultGenerator<Double>(
 			Settings.DISTRIBUTION_SIZE,
 			n -> String.format("v=[%.2f, %.2f]", n * Settings.DISTRIBUTION_STEP, (n + 1) * Settings.DISTRIBUTION_STEP));
-	private BiConsumer<Integer, Cell> writeFunctionIntegers = (v, c) -> c.setCellValue((double) v);
+	private BiConsumer<Integer, Cell> writeFunctionIntegers = (v, c) -> c.setCellValue(v);
 	private BiConsumer<Double, Cell> writeFunctionDouble = (v, c) -> c.setCellValue(v);
 
 	public void stepCallback(ParticleSystem<GeometricVector3D, ContinuumParticle3D> stateIn) {
@@ -412,8 +422,8 @@ public class RealGasFrame extends JFrame {
 				double currentRealTime = System.currentTimeMillis();
 				double simS = ((currentTime - lastSave) / (currentRealTime - lastSaveRealTime)) * 60000.0d;
 				simSpeedField.addValue(simS);
-				this.currentTime.setValue(currentTime);
-				energyRatio.setValue(stateIn.getTotalEnergy() / beginEnergy);
+				this.currentTime.setText(currentTime);
+				energyRatio.setText(stateIn.getTotalEnergy() / beginEnergy);
 				lastSaveRealTime = currentRealTime;
 				lastSave = currentTime;
 
@@ -431,6 +441,9 @@ public class RealGasFrame extends JFrame {
 							new DoubleResult(stateIn.calculateParameter(p -> p.speed.getY(), (r, d) -> r + d, 0)));
 					resu.append(RealGasFrame.PARAMETER_NAMES[9],
 							new DoubleResult(stateIn.calculateParameter(p -> p.speed.getZ(), (r, d) -> r + d, 0)));
+					// Adding average kinetic energy
+					resu.append(RealGasFrame.PARAMETER_NAMES[15],
+							new DoubleResult(stateIn.getKineticEnergy() / stateIn.size()));
 					// Adding veldist
 					int[] distrib = stateIn.distributeVelocity(d -> (int) (d / Settings.DISTRIBUTION_STEP),
 							Settings.DISTRIBUTION_SIZE);
@@ -498,6 +511,9 @@ public class RealGasFrame extends JFrame {
 						}
 						return res / size;
 					}, Double::sum, 0.0d) / stateIn.size()));
+					// Adding average kinetic energy
+					result.append(RealGasFrame.PARAMETER_NAMES[15],
+							new DoubleResult(stateIn.getKineticEnergy() / stateIn.size()));
 					// Adding veldist
 					int[] distrib = stateIn.distributeVelocity(d -> (int) (d / Settings.DISTRIBUTION_STEP),
 							Settings.DISTRIBUTION_SIZE);
@@ -549,6 +565,7 @@ public class RealGasFrame extends JFrame {
 					} else {
 						System.out.println("Ended batch");
 						beginBatch.setEnabled(true);
+						simNoLabel.setText(0, 0);
 					}
 				}
 			}
@@ -564,19 +581,8 @@ public class RealGasFrame extends JFrame {
 		for (Result res : tmpResult) {
 			result.append(RealGasFrame.PARAMETER_NAMES[4], new DoubleResult(simno));
 			// Adding Time
-			doubleParameter = (ArrayList<DoubleResult>) res.getValuesFor(RealGasFrame.PARAMETER_NAMES[0]);
-			result.append(RealGasFrame.PARAMETER_NAMES[0], doubleParameter.get(doubleParameter.size() - 1));
-			// Adding energies
-			doubleParameter = (ArrayList<DoubleResult>) res.getValuesFor(RealGasFrame.PARAMETER_NAMES[3]);
-			result.append(RealGasFrame.PARAMETER_NAMES[5], doubleParameter.get(0));
-			result.append(RealGasFrame.PARAMETER_NAMES[3], doubleParameter.get(doubleParameter.size() - 1));
-			// Adding end reason
-			try {
-				result.append(RealGasFrame.PARAMETER_NAMES[6],
-						res.getValuesFor(RealGasFrame.PARAMETER_NAMES[6]).get(0));
-			} catch (NullPointerException e) {
-				System.out.println(String.format("Simulation №%s had no \"End Reason\" parameter", simno));
-			}
+			ArrayList<DoubleResult> time = (ArrayList<DoubleResult>) res.getValuesFor(RealGasFrame.PARAMETER_NAMES[0]);
+			result.append(RealGasFrame.PARAMETER_NAMES[0], time.get(time.size() - 1));
 			// Adding vx
 			doubleParameter = (ArrayList<DoubleResult>) res.getValuesFor(RealGasFrame.PARAMETER_NAMES[7]);
 			result.append(RealGasFrame.PARAMETER_NAMES[7], doubleParameter.get(doubleParameter.size() - 1));
@@ -589,21 +595,87 @@ public class RealGasFrame extends JFrame {
 			// Adding minimum distance
 			doubleParameter = (ArrayList<DoubleResult>) res.getValuesFor(RealGasFrame.PARAMETER_NAMES[12]);
 			result.append(RealGasFrame.PARAMETER_NAMES[12], doubleParameter.get(doubleParameter.size() - 1));
+			// Adding energies
+			// Adding average kinetic energy
 			// Adding veldist
+			ArrayList<DoubleResult> energy = (ArrayList<DoubleResult>) res
+					.getValuesFor(RealGasFrame.PARAMETER_NAMES[3]);
+			DoubleResult beginEnergy;
 			distributionParameter = (ArrayList<DistributionResultGenerator<Integer>.DistributionResult>) res
 					.getValuesFor(RealGasFrame.PARAMETER_NAMES[11]);
-			// Adding veldist
-			@SuppressWarnings("rawtypes")
-			DistributionResult velDist = distributionParameter.get(distributionParameter.size() - 1);
-			if (Settings.ENABLE_GAUSSIAN_MEAN) {
-				velDist = veldistGeneratorD.generate(MathUtil.applyGaussianBlur(velDist.data(), Settings.SIGMA,
-						d -> (double) (int) d, d -> d, new Double[Settings.DISTRIBUTION_SIZE]), writeFunctionDouble);
-				result.append(RealGasFrame.PARAMETER_NAMES[13], velDist);
+			doubleParameter = (ArrayList<DoubleResult>) res.getValuesFor(RealGasFrame.PARAMETER_NAMES[15]);
+			if (Settings.ENABLE_BATCH_AVERAGE) {
+				ArrayList<Double> meanKinEnergies = new ArrayList<Double>(0);
+				ArrayList<DistributionResultGenerator<Integer>.DistributionResult> distributions = new ArrayList<DistributionResultGenerator<Integer>.DistributionResult>(
+						0);
+				int i = 0;
+				int timeSize = time.size();
+				for (; (i < timeSize) && (time.get(i).value < Settings.BATCH_AVERAGE_MIN_TIME); i++) {
+				}
+				if (i == timeSize) {
+					beginEnergy = energy.get(0);
+				} else {
+					beginEnergy = energy.get(i);
+				}
+				for (; i < time.size(); i++) {
+					meanKinEnergies.add(doubleParameter.get(i).value);
+					distributions.add(distributionParameter.get(i));
+				}
+				if (meanKinEnergies.isEmpty()) {
+					result.append(RealGasFrame.PARAMETER_NAMES[15], new PrecisedResultValue(-1.0d));
+					result.append(RealGasFrame.PARAMETER_NAMES[11],
+							distributionParameter.get(distributionParameter.size() - 1));
+				} else if (meanKinEnergies.size() == 1) {
+					result.append(RealGasFrame.PARAMETER_NAMES[15], new PrecisedResultValue(meanKinEnergies.get(0)));
+					result.append(RealGasFrame.PARAMETER_NAMES[11], distributions.get(0));
+				} else {
+					result.append(RealGasFrame.PARAMETER_NAMES[15], new PrecisedResultValue(meanKinEnergies));
+					result.append(RealGasFrame.PARAMETER_NAMES[11], averageDistribution(distributions));
+				}
 			} else {
-				result.append(RealGasFrame.PARAMETER_NAMES[11], velDist);
+				result.append(RealGasFrame.PARAMETER_NAMES[15], doubleParameter.get(doubleParameter.size() - 1));
+				@SuppressWarnings("rawtypes")
+				DistributionResult velDist = distributionParameter.get(distributionParameter.size() - 1);
+				if (Settings.ENABLE_GAUSSIAN_MEAN) {
+					velDist = veldistGeneratorD.generate(MathUtil.applyGaussianBlur(velDist.data(), Settings.SIGMA,
+							d -> (double) (int) d, d -> d, new Double[Settings.DISTRIBUTION_SIZE]),
+							writeFunctionDouble);
+					result.append(RealGasFrame.PARAMETER_NAMES[13], velDist);
+				} else {
+					result.append(RealGasFrame.PARAMETER_NAMES[11], velDist);
+				}
+				beginEnergy = energy.get(0);
 			}
-
+			result.append(RealGasFrame.PARAMETER_NAMES[5], beginEnergy);
+			result.append(RealGasFrame.PARAMETER_NAMES[3], energy.get(energy.size() - 1));
+			// Adding end reason
+			try {
+				result.append(RealGasFrame.PARAMETER_NAMES[6],
+						res.getValuesFor(RealGasFrame.PARAMETER_NAMES[6]).get(0));
+			} catch (NullPointerException e) {
+				System.out.println(String.format("Simulation №%s had no \"End Reason\" parameter", simno));
+			}
 			simno++;
 		}
+	}
+
+	private DistributionResultGenerator<Double>.DistributionResult averageDistribution(
+			ArrayList<DistributionResultGenerator<Integer>.DistributionResult> dist) {
+		int size = dist.get(0).size();
+		Double[] res = new Double[size];
+		for (int i = 0; i < size; i++) {
+			res[i] = 0.0d;
+		}
+		for (DistributionResultGenerator<Integer>.DistributionResult r : dist) {
+			Integer[] data = r.data();
+			for (int i = 0; i < size; i++) {
+				res[i] += data[i];
+			}
+		}
+		int distis = dist.size();
+		for (int i = 0; i < size; i++) {
+			res[i] /= distis;
+		}
+		return veldistGeneratorD.generate(res, writeFunctionDouble);
 	}
 }
