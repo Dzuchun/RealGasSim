@@ -2,11 +2,7 @@ package dzuchun.sim.simplegas;
 
 import java.util.Collection;
 
-import org.apache.poi.ss.usermodel.CellStyle;
-import org.apache.poi.ss.usermodel.Row;
-
-import dzuchun.lib.io.SpreadsheetHelper;
-import dzuchun.lib.io.SpreadsheetHelper.ResultValue;
+import dzuchun.lib.io.SaveHelper.ResultValue;
 import dzuchun.lib.math.PrecisedValue;
 
 public class PrecisedResultValue extends PrecisedValue implements ResultValue {
@@ -24,9 +20,8 @@ public class PrecisedResultValue extends PrecisedValue implements ResultValue {
 	}
 
 	@Override
-	public void writeTo(Row rowIn, int cellNo, CellStyle cellStyleIn) {
-		SpreadsheetHelper.addCellWithValue(rowIn, cellNo++, mean, cellStyleIn);
-		SpreadsheetHelper.addCellWithValue(rowIn, cellNo, deviation, cellStyleIn);
+	public String[] asValues() {
+		return new String[] { mean + "", deviation + "" };
 	}
 
 	@Override

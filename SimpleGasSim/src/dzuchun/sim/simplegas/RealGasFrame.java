@@ -10,7 +10,6 @@ import java.awt.Font;
 import java.awt.GridLayout;
 import java.awt.event.ActionEvent;
 import java.util.ArrayList;
-import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
@@ -24,13 +23,11 @@ import javax.swing.JTextField;
 import javax.swing.SwingConstants;
 import javax.swing.WindowConstants;
 
-import org.apache.poi.ss.usermodel.Cell;
-
 import dzuchun.lib.io.DistributionResultGenerator;
 import dzuchun.lib.io.DistributionResultGenerator.DistributionResult;
 import dzuchun.lib.io.DoubleResult;
-import dzuchun.lib.io.SpreadsheetHelper;
-import dzuchun.lib.io.SpreadsheetHelper.Result;
+import dzuchun.lib.io.SaveHelper;
+import dzuchun.lib.io.SaveHelper.Result;
 import dzuchun.lib.io.StringResult;
 import dzuchun.lib.math.GeometricVector3D;
 import dzuchun.lib.math.MathUtil;
@@ -120,7 +117,7 @@ public class RealGasFrame extends JFrame {
 						mergeBatchResults();
 					}
 					try {
-						SpreadsheetHelper.saveResToFile(result, Settings.SAVES_FORDER + Settings.FILENAME_FORMAT);
+						SaveHelper.saveResToFile(result, Settings.SAVES_FORDER + Settings.FILENAME_FORMAT);
 					} catch (InterruptedException e1) {
 						e1.printStackTrace();
 					}
@@ -369,7 +366,7 @@ public class RealGasFrame extends JFrame {
 		startButton.setText(RealGasFrame.START_BUTTON_MESSAGES[2]);
 		state = State.PAUSED;
 		saveButton.setEnabled(true);
-		System.out.println("Simulated time: " + sim.getSimulation().getCurrentTime());
+		System.out.println("Simulated time: " + sim.getSimulation().getCurrentParameter());
 		if (batch) {
 			System.out.println("Now running simulation " + currentSim + " / " + totalSim);
 		}
@@ -384,7 +381,7 @@ public class RealGasFrame extends JFrame {
 		timeField.setEnabled(true);
 		energyField.setEnabled(true);
 		simulationsField.setEnabled(true);
-		System.out.println("Simulated time: " + sim.getSimulation().getCurrentTime());
+		System.out.println("Simulated time: " + sim.getSimulation().getCurrentParameter());
 		if (batch) {
 //			batch = false;
 			System.out.println("Finished sims: " + currentSim + " / " + totalSim);
@@ -408,14 +405,12 @@ public class RealGasFrame extends JFrame {
 	private DistributionResultGenerator<Double> veldistGeneratorD = new DistributionResultGenerator<Double>(
 			Settings.DISTRIBUTION_SIZE,
 			n -> String.format("v=[%.2f, %.2f]", n * Settings.DISTRIBUTION_STEP, (n + 1) * Settings.DISTRIBUTION_STEP));
-	private BiConsumer<Integer, Cell> writeFunctionIntegers = (v, c) -> c.setCellValue(v);
-	private BiConsumer<Double, Cell> writeFunctionDouble = (v, c) -> c.setCellValue(v);
 
 	public void stepCallback(ParticleSystem<GeometricVector3D, ContinuumParticle3D> stateIn) {
 		// Saving
 		if (Settings.ENABLE_FILESAVE) {
 			// Checking for interval passed
-			double currentTime = stateIn.getCurrentTime();
+			double currentTime = stateIn.getCurrentParameter();
 			if (((currentTime - lastSave) >= Settings.SAVE_INTERVAL)) {
 
 				// Updating simulation speed
@@ -451,8 +446,7 @@ public class RealGasFrame extends JFrame {
 					for (int i = 0; i < distrib.length; i++) {
 						distribIntegers[i] = distrib[i];
 					}
-					resu.append(RealGasFrame.PARAMETER_NAMES[11],
-							veldistGenerator.generate(distribIntegers, writeFunctionIntegers));
+					resu.append(RealGasFrame.PARAMETER_NAMES[11], veldistGenerator.generate(distribIntegers));
 					// Adding minimum distance
 					final double maxDistance = 10 * Settings.CONTINUUM_MAX_X;
 					resu.append(RealGasFrame.PARAMETER_NAMES[12], new DoubleResult(stateIn.calculateParameter(p1 -> {
@@ -522,14 +516,11 @@ public class RealGasFrame extends JFrame {
 						distribIntegers[i] = distrib[i];
 					}
 					@SuppressWarnings("rawtypes")
-					DistributionResult velDist = veldistGenerator.generate(distribIntegers, writeFunctionIntegers);
+					DistributionResult velDist = veldistGenerator.generate(distribIntegers);
 					if (Settings.ENABLE_GAUSSIAN_MEAN) {
 						// Applying gaussian blur
-						velDist = veldistGeneratorD
-								.generate(
-										MathUtil.applyGaussianBlur(velDist.data(), Settings.SIGMA,
-												d -> (double) (int) d, d -> d, new Double[Settings.DISTRIBUTION_SIZE]),
-										writeFunctionDouble);
+						velDist = veldistGeneratorD.generate(MathUtil.applyGaussianBlur(velDist.data(), Settings.SIGMA,
+								d -> (double) (int) d, d -> d, new Double[Settings.DISTRIBUTION_SIZE]));
 						result.append(RealGasFrame.PARAMETER_NAMES[13], velDist);
 					} else {
 						result.append(RealGasFrame.PARAMETER_NAMES[11], velDist);
@@ -540,7 +531,7 @@ public class RealGasFrame extends JFrame {
 			if (batch) {
 				// batch simulation
 //			System.out.println("Callback at " + stateIn.getCurrentTime());
-				boolean time = stateIn.getCurrentTime() > maxTime;
+				boolean time = stateIn.getCurrentParameter() > maxTime;
 				boolean energy = Math.abs((stateIn.getTotalEnergy() / beginEnergy) - 1) > maxEnergyDelta;
 				if (time || energy) {
 					System.out.print("Simulation " + currentSim + " / " + totalSim + " was ended. Reason: ");
@@ -638,8 +629,7 @@ public class RealGasFrame extends JFrame {
 				DistributionResult velDist = distributionParameter.get(distributionParameter.size() - 1);
 				if (Settings.ENABLE_GAUSSIAN_MEAN) {
 					velDist = veldistGeneratorD.generate(MathUtil.applyGaussianBlur(velDist.data(), Settings.SIGMA,
-							d -> (double) (int) d, d -> d, new Double[Settings.DISTRIBUTION_SIZE]),
-							writeFunctionDouble);
+							d -> (double) (int) d, d -> d, new Double[Settings.DISTRIBUTION_SIZE]));
 					result.append(RealGasFrame.PARAMETER_NAMES[13], velDist);
 				} else {
 					result.append(RealGasFrame.PARAMETER_NAMES[11], velDist);
@@ -676,6 +666,6 @@ public class RealGasFrame extends JFrame {
 		for (int i = 0; i < size; i++) {
 			res[i] /= distis;
 		}
-		return veldistGeneratorD.generate(res, writeFunctionDouble);
+		return veldistGeneratorD.generate(res);
 	}
 }

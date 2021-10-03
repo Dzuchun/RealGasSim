@@ -227,7 +227,8 @@ public class ParticleSystem<V extends GeometricVector, T extends Particle<V>> ex
 		return String.format("Name:%s, Particles:%s", this.getClass().getSimpleName(), toString());
 	}
 
-	public double getCurrentTime() {
+	@Override
+	public Double getCurrentParameter() {
 		return time;
 	}
 }
